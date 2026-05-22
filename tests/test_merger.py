@@ -1,14 +1,14 @@
 import pytest
-from scrapefmt.models import ScrapedTable
 from scrapefmt.merger import TableMerger
+from scrapefmt.models import ScrapedTable
 
 
-@pytest.fixture
+@pytest.fixture()
 def merger():
     return TableMerger()
 
 
-@pytest.fixture
+@pytest.fixture()
 def table_a():
     return ScrapedTable(
         headers=["Name", "Age"],
@@ -16,99 +16,90 @@ def table_a():
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def table_b():
     return ScrapedTable(
-        headers=["Name", "City"],
-        rows=[["Charlie", "NYC"], ["Diana", "LA"]],
+        headers=["Name", "Age"],
+        rows=[["Carol", "28"], ["Dave", "35"]],
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def table_no_headers():
-    return ScrapedTable(
-        headers=None,
-        rows=[["X", "1"], ["Y", "2"]],
-    )
+    return ScrapedTable(headers=None, rows=[["X", "1"], ["Y", "2"]])
 
 
 def test_stack_merges_rows(merger, table_a, table_b):
     result = merger.stack([table_a, table_b])
-    assert result.num_rows() == 4
+    assert len(result.rows) == 4
 
 
-def test_stack_union_of_headers(merger, table_a, table_b):
+def test_stack_keeps_first_headers(merger, table_a, table_b):
     result = merger.stack([table_a, table_b])
-    assert result.headers == ["Name", "Age", "City"]
-
-
-def test_stack_fills_missing_values(merger, table_a, table_b):
-    result = merger.stack([table_a, table_b])
-    # table_b rows should have empty Age
-    assert result.rows[2] == ["Charlie", "", "NYC"]
-    assert result.rows[3] == ["Diana", "", "LA"]
-
-
-def test_stack_custom_fill_missing():
-    merger = TableMerger(fill_missing="N/A")
-    t1 = ScrapedTable(headers=["A"], rows=[["1"]])
-    t2 = ScrapedTable(headers=["B"], rows=[["2"]])
-    result = merger.stack([t1, t2])
-    assert result.rows[0] == ["1", "N/A"]
-    assert result.rows[1] == ["N/A", "2"]
-
-
-def test_stack_raises_on_empty_list(merger):
-    with pytest.raises(ValueError, match="No tables"):
-        merger.stack([])
-
-
-def test_stack_raises_without_headers(merger, table_no_headers):
-    with pytest.raises(ValueError, match="headers"):
-        merger.stack([table_no_headers])
-
-
-def test_concat_combines_rows(merger, table_a):
-    result = merger.concat([table_a, table_a])
-    assert result.num_rows() == 4
     assert result.headers == ["Name", "Age"]
 
 
-def test_concat_raises_on_column_mismatch(merger):
-    t1 = ScrapedTable(headers=["A", "B"], rows=[["1", "2"]])
-    t2 = ScrapedTable(headers=["A"], rows=[["3"]])
-    with pytest.raises(ValueError, match="columns"):
-        merger.concat([t1, t2])
+def test_stack_empty_list_raises(merger):
+    with pytest.raises(ValueError, match="empty list"):
+        merger.stack([])
 
 
-def test_concat_raises_on_empty_list(merger):
-    with pytest.raises(ValueError, match="No tables"):
+def test_stack_single_table(merger, table_a):
+    result = merger.stack([table_a])
+    assert result.rows == table_a.rows
+
+
+def test_concat_merges_columns(merger, table_a):
+    extra = ScrapedTable(headers=["City"], rows=[["NY"], ["LA"]])
+    result = merger.concat([table_a, extra])
+    assert result.headers == ["Name", "Age", "City"]
+    assert result.rows[0] == ["Alice", "30", "NY"]
+
+
+def test_concat_empty_list_raises(merger):
+    with pytest.raises(ValueError, match="empty list"):
         merger.concat([])
 
 
-def test_join_combines_columns(merger, table_a, table_b):
-    result = merger.join(table_a, table_b)
-    assert result.num_columns() == 4
-    assert result.headers == ["Name", "Age", "Name", "City"]
-
-
-def test_join_pads_shorter_table(merger):
+def test_concat_pads_shorter_table(merger):
     t1 = ScrapedTable(headers=["A"], rows=[["1"], ["2"], ["3"]])
-    t2 = ScrapedTable(headers=["B"], rows=[["X"]])
-    result = merger.join(t1, t2)
-    assert result.num_rows() == 3
+    t2 = ScrapedTable(headers=["B"], rows=[["x"]])
+    result = merger.concat([t1, t2])
+    assert len(result.rows) == 3
     assert result.rows[1] == ["2", ""]
-    assert result.rows[2] == ["3", ""]
 
 
-def test_join_raises_on_mixed_headers(merger, table_a, table_no_headers):
+def test_join_inner_join(merger):
+    left = ScrapedTable(headers=["id", "name"], rows=[["1", "Alice"], ["2", "Bob"], ["3", "Carol"]])
+    right = ScrapedTable(headers=["id", "score"], rows=[["1", "90"], ["3", "85"]])
+    result = merger.join(left, right, left_on="id", right_on="id")
+    assert result.headers == ["id", "name", "score"]
+    assert len(result.rows) == 2
+    assert ["1", "Alice", "90"] in result.rows
+    assert ["3", "Carol", "85"] in result.rows
+
+
+def test_join_missing_left_column_raises(merger):
+    left = ScrapedTable(headers=["id"], rows=[["1"]])
+    right = ScrapedTable(headers=["id"], rows=[["1"]])
+    with pytest.raises(KeyError, match="bad_col"):
+        merger.join(left, right, left_on="bad_col", right_on="id")
+
+
+def test_join_missing_right_column_raises(merger):
+    left = ScrapedTable(headers=["id"], rows=[["1"]])
+    right = ScrapedTable(headers=["id"], rows=[["1"]])
+    with pytest.raises(KeyError, match="bad_col"):
+        merger.join(left, right, left_on="id", right_on="bad_col")
+
+
+def test_join_no_headers_raises(merger, table_no_headers):
     with pytest.raises(ValueError, match="headers"):
-        merger.join(table_a, table_no_headers)
+        merger.join(table_no_headers, table_no_headers, left_on="A", right_on="A")
 
 
-def test_join_no_headers(merger):
-    t1 = ScrapedTable(headers=None, rows=[["1", "2"]])
-    t2 = ScrapedTable(headers=None, rows=[["3", "4"]])
-    result = merger.join(t1, t2)
-    assert result.headers is None
-    assert result.rows[0] == ["1", "2", "3", "4"]
+def test_join_no_matching_rows_returns_empty(merger):
+    left = ScrapedTable(headers=["id", "val"], rows=[["1", "a"]])
+    right = ScrapedTable(headers=["id", "val"], rows=[["99", "z"]])
+    result = merger.join(left, right, left_on="id", right_on="id")
+    assert result.rows == []
