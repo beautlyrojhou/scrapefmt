@@ -1,78 +1,76 @@
-"""Fluent pipeline for scraping, filtering, transforming, and exporting tables."""
-
-from typing import Callable, Dict, List, Optional
-from scrapefmt.models import ScrapedTable
-from scrapefmt.scraper import TableScraper
-from scrapefmt.filters import TableFilter
-from scrapefmt.transformers import TableTransformer
-from scrapefmt.format_registry import FormatRegistry
+from typing import List, Optional
+from .models import ScrapedTable
+from .scraper import TableScraper
+from .filters import TableFilter
+from .transformers import TableTransformer
+from .validators import TableValidator, ValidationError
+from .summarizer import TableSummarizer
 
 
 class ScrapePipeline:
-    """Chainable pipeline for table scraping and transformation."""
+    """Fluent pipeline for scraping, filtering, transforming and exporting tables."""
 
-    def __init__(self, table: ScrapedTable):
+    def __init__(self, table: ScrapedTable) -> None:
         self._table = table
-        self._registry = FormatRegistry()
 
     @classmethod
     def from_html(cls, html: str, table_index: int = 0) -> "ScrapePipeline":
-        """Create a pipeline by scraping a table from an HTML string."""
         scraper = TableScraper()
         tables = scraper.scrape_html(html)
         if not tables:
-            raise ValueError("No tables found in provided HTML.")
+            raise ValueError("No tables found in the provided HTML.")
         if table_index >= len(tables):
             raise IndexError(
-                f"Table index {table_index} out of range; {len(tables)} table(s) found."
+                f"Table index {table_index} out of range; "
+                f"only {len(tables)} table(s) found."
             )
         return cls(tables[table_index])
 
     def exclude_empty_rows(self) -> "ScrapePipeline":
-        """Remove rows where all cells are empty."""
-        self._table = TableFilter(self._table).exclude_empty_rows().result()
+        f = TableFilter(self._table)
+        self._table = f.exclude_empty_rows()
         return self
 
     def filter_columns(self, columns: List[str]) -> "ScrapePipeline":
-        """Keep only the specified columns (requires headers)."""
-        self._table = TableFilter(self._table).filter_columns(columns).result()
+        f = TableFilter(self._table)
+        self._table = f.filter_columns(columns)
         return self
 
-    def filter_rows(self, predicate: Callable[[List[str]], bool]) -> "ScrapePipeline":
-        """Keep only rows matching the predicate."""
-        self._table = TableFilter(self._table).filter_rows(predicate).result()
+    def filter_rows(self, predicate) -> "ScrapePipeline":
+        f = TableFilter(self._table)
+        self._table = f.filter_rows(predicate)
         return self
 
-    def rename_columns(self, mapping: Dict[str, str]) -> "ScrapePipeline":
-        """Rename columns using a mapping dict."""
-        self._table = TableTransformer(self._table).rename_columns(mapping).result()
+    def rename_columns(self, mapping: dict) -> "ScrapePipeline":
+        t = TableTransformer(self._table)
+        self._table = t.rename_columns(mapping)
         return self
 
-    def transform_column(
-        self, column: str, fn: Callable[[str], str]
-    ) -> "ScrapePipeline":
-        """Apply a transformation function to a column."""
-        self._table = TableTransformer(self._table).transform_column(column, fn).result()
+    def transform_column(self, column: str, func) -> "ScrapePipeline":
+        t = TableTransformer(self._table)
+        self._table = t.transform_column(column, func)
         return self
 
     def strip_whitespace(self) -> "ScrapePipeline":
-        """Strip whitespace from all cells and headers."""
-        self._table = TableTransformer(self._table).strip_whitespace().result()
+        t = TableTransformer(self._table)
+        self._table = t.strip_whitespace()
         return self
 
-    def fill_empty(
-        self, value: str = "", column: Optional[str] = None
-    ) -> "ScrapePipeline":
-        """Fill empty cells with a default value."""
-        self._table = TableTransformer(self._table).fill_empty(value, column).result()
+    def validate(self, **kwargs) -> "ScrapePipeline":
+        v = TableValidator(self._table, **kwargs)
+        v.validate()
         return self
+
+    def summarize(self) -> dict:
+        """Return a summary of the current table state."""
+        return TableSummarizer(self._table).summarize()
 
     def export(self, fmt: str, **kwargs) -> str:
-        """Export the table using a registered format exporter."""
-        exporter_cls = self._registry.get(fmt)
-        exporter = exporter_cls(**kwargs)
-        return exporter.export(self._table)
+        from .format_registry import FormatRegistry
+        registry = FormatRegistry()
+        exporter_cls = registry.get(fmt)
+        exporter = exporter_cls(self._table, **kwargs)
+        return exporter.export()
 
-    def result(self) -> ScrapedTable:
-        """Return the current ScrapedTable from the pipeline."""
+    def get_table(self) -> ScrapedTable:
         return self._table
