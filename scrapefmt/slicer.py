@@ -3,51 +3,60 @@ from scrapefmt.models import ScrapedTable
 
 
 class TableSlicer:
-    """Slice rows and columns from a ScrapedTable by index ranges."""
+    """
+    Provides row and column slicing operations on a ScrapedTable.
+    """
 
     def __init__(self, table: ScrapedTable) -> None:
-        self._table = table
+        self.table = table
 
-    def slice_rows(self, start: int = 0, stop: Optional[int] = None, step: int = 1) -> ScrapedTable:
-        """Return a new ScrapedTable containing only rows[start:stop:step]."""
-        sliced = self._table.rows[start:stop:step]
-        return ScrapedTable(headers=self._table.headers, rows=sliced)
-
-    def slice_columns(self, start: int = 0, stop: Optional[int] = None, step: int = 1) -> ScrapedTable:
-        """Return a new ScrapedTable containing only columns[start:stop:step]."""
-        col_slice = slice(start, stop, step)
-
-        new_headers: Optional[List[str]] = None
-        if self._table.headers:
-            new_headers = self._table.headers[col_slice]
-
-        new_rows = [row[col_slice] for row in self._table.rows]
-        return ScrapedTable(headers=new_headers, rows=new_rows)
+    def slice_rows(self, start: int, stop: Optional[int] = None, step: int = 1) -> ScrapedTable:
+        """
+        Return a new ScrapedTable containing only rows[start:stop:step].
+        Headers are preserved unchanged.
+        """
+        sliced = self.table.rows[start:stop:step]
+        return ScrapedTable(headers=self.table.headers, rows=sliced)
 
     def head(self, n: int = 5) -> ScrapedTable:
-        """Return the first n rows."""
+        """
+        Return the first *n* rows.
+        """
         if n < 0:
             raise ValueError(f"n must be non-negative, got {n}")
-        return self.slice_rows(0, n)
+        return ScrapedTable(headers=self.table.headers, rows=self.table.rows[:n])
 
     def tail(self, n: int = 5) -> ScrapedTable:
-        """Return the last n rows."""
+        """
+        Return the last *n* rows.
+        """
         if n < 0:
             raise ValueError(f"n must be non-negative, got {n}")
         if n == 0:
-            return ScrapedTable(headers=self._table.headers, rows=[])
-        return self.slice_rows(-n)
+            return ScrapedTable(headers=self.table.headers, rows=[])
+        return ScrapedTable(headers=self.table.headers, rows=self.table.rows[-n:])
 
-    def row_at(self, index: int) -> List[str]:
-        """Return a single row by index."""
-        try:
-            return self._table.rows[index]
-        except IndexError:
-            raise IndexError(f"Row index {index} is out of range (table has {len(self._table.rows)} rows)")
+    def slice_columns(self, indices: List[int]) -> ScrapedTable:
+        """
+        Return a new ScrapedTable keeping only the columns at the given *indices*.
+        """
+        num_cols = self.table.num_columns()
+        for idx in indices:
+            if idx < 0 or idx >= num_cols:
+                raise IndexError(f"Column index {idx} is out of range (table has {num_cols} columns)")
 
-    def column_at(self, index: int) -> List[str]:
-        """Return all values in a single column by index."""
-        num_cols = len(self._table.headers) if self._table.headers else (len(self._table.rows[0]) if self._table.rows else 0)
-        if index < -num_cols or index >= num_cols:
-            raise IndexError(f"Column index {index} is out of range (table has {num_cols} columns)")
-        return [row[index] for row in self._table.rows]
+        new_headers: Optional[List[str]] = None
+        if self.table.headers:
+            new_headers = [self.table.headers[i] for i in indices]
+
+        new_rows = [[row[i] for i in indices] for row in self.table.rows]
+        return ScrapedTable(headers=new_headers, rows=new_rows)
+
+    def column_range(self, start: int, stop: Optional[int] = None) -> ScrapedTable:
+        """
+        Return a new ScrapedTable keeping columns from *start* up to (but not including) *stop*.
+        """
+        num_cols = self.table.num_columns()
+        resolved_stop = num_cols if stop is None else stop
+        indices = list(range(start, resolved_stop))
+        return self.slice_columns(indices)
