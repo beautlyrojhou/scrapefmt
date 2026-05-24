@@ -1,30 +1,4 @@
-"""scrapefmt — scrape structured data from HTML tables and export to multiple formats.
-
-Public API
-----------
-ScrapedTable      : Data model representing a scraped HTML table.
-TableScraper      : Fetches and parses HTML tables from a URL or raw HTML.
-CSVExporter       : Exports a ScrapedTable to CSV format.
-JSONExporter      : Exports a ScrapedTable to JSON format.
-MarkdownExporter  : Exports a ScrapedTable to Markdown format.
-FormatRegistry    : Registry for looking up exporters by format name.
-TableFilter       : Filters rows/columns of a ScrapedTable.
-ScrapePipeline    : Chains multiple scraping and transformation steps.
-TableValidator    : Validates table structure and cell values.
-ValidationError   : Raised when table validation fails.
-TableTransformer  : Applies arbitrary transformations to a ScrapedTable.
-TableSummarizer   : Computes summary statistics over table columns.
-TableMerger       : Merges two or more ScrapedTables together.
-TableSorter       : Sorts rows of a ScrapedTable by one or more columns.
-TableDeduplicator : Removes duplicate rows from a ScrapedTable.
-TableCleaner      : Strips and normalises cell values in a ScrapedTable.
-TablePaginator    : Splits a ScrapedTable into fixed-size pages.
-TableCaster       : Casts column values to specified Python types.
-CastError         : Raised when a type cast fails.
-TableFlattener    : Flattens nested/multi-level headers into a single row.
-TableSlicer       : Extracts a row/column slice from a ScrapedTable.
-TableGrouper      : Groups rows of a ScrapedTable by a key column.
-"""
+"""scrapefmt — scrape structured data from HTML tables and export to multiple formats."""
 
 from scrapefmt.models import ScrapedTable
 from scrapefmt.scraper import TableScraper
@@ -44,6 +18,11 @@ from scrapefmt.caster import TableCaster, CastError
 from scrapefmt.flattener import TableFlattener
 from scrapefmt.slicer import TableSlicer
 from scrapefmt.grouper import TableGrouper
+from scrapefmt.renamer import TableRenamer, RenameError
+from scrapefmt.pivotter import TablePivotter, PivotError
+from scrapefmt.differ import TableDiffer, DiffError
+from scrapefmt.sampler import TableSampler, SampleError
+from scrapefmt.aggregator import TableAggregator, AggregateError
 
 __all__ = [
     "ScrapedTable",
@@ -68,4 +47,16 @@ __all__ = [
     "TableFlattener",
     "TableSlicer",
     "TableGrouper",
+    "TableRenamer",
+    "RenameError",
+    "TablePivotter",
+    "PivotError",
+    "TableDiffer",
+    "DiffError",
+    "TableSampler",
+    "SampleError",
+    "TableAggregator",
+    "AggregateError",
 ]
+
+__version__ = "0.1.0"

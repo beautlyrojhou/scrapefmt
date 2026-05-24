@@ -1,39 +1,32 @@
-"""Data models for scraped table structures."""
-
+from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 @dataclass
 class ScrapedTable:
-    """Represents a scraped HTML table with headers and rows."""
+    """Represents a scraped HTML table with optional headers and row data."""
 
     headers: List[str] = field(default_factory=list)
     rows: List[List[str]] = field(default_factory=list)
-    caption: Optional[str] = None
-    source_url: Optional[str] = None
 
     @property
     def num_rows(self) -> int:
-        """Return the number of data rows."""
         return len(self.rows)
 
     @property
     def num_columns(self) -> int:
-        """Return the number of columns based on headers."""
-        return len(self.headers)
+        if self.headers:
+            return len(self.headers)
+        return len(self.rows[0]) if self.rows else 0
 
-    def to_dict_list(self) -> List[dict]:
-        """Convert rows to a list of dicts keyed by header names."""
+    def to_dict_list(self) -> List[Dict[str, str]]:
         if not self.headers:
-            return [{str(i): val for i, val in enumerate(row)} for row in self.rows]
-        return [
-            {header: (row[i] if i < len(row) else "") for i, header in enumerate(self.headers)}
-            for row in self.rows
-        ]
+            return []
+        return [dict(zip(self.headers, row)) for row in self.rows]
 
     def __repr__(self) -> str:
         return (
             f"ScrapedTable(headers={self.headers!r}, "
-            f"num_rows={self.num_rows}, source_url={self.source_url!r})"
+            f"num_rows={self.num_rows}, num_columns={self.num_columns})"
         )
