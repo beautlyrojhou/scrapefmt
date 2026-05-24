@@ -75,3 +75,17 @@ class TableValidator:
             return True
         except ValidationError:
             return False
+
+    def get_errors(self, table: ScrapedTable) -> List[str]:
+        """Return a list of validation error messages for the given table.
+
+        Unlike ``validate``, this method does not raise an exception.
+        Returns an empty list if the table is valid.
+        """
+        try:
+            self.validate(table)
+            return []
+        except ValidationError as exc:
+            # Re-parse individual messages split by the single-space join
+            # used in validate(), preserving the original sentence boundaries.
+            return [msg.strip() for msg in str(exc).split(".") if msg.strip()]
