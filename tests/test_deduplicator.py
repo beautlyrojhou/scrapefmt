@@ -57,6 +57,14 @@ def test_deduplicate_by_column(sample_table):
     assert cities.count("LA") == 1
 
 
+def test_deduplicate_by_column_preserves_first_occurrence(sample_table):
+    """Deduplicating by City should keep the first row for each city value."""
+    dedup = TableDeduplicator(sample_table)
+    result = dedup.deduplicate_by_column("City")
+    nyc_rows = [r for r in result.rows if r[2] == "NYC"]
+    assert nyc_rows[0] == ["1", "Alice", "NYC"]
+
+
 def test_deduplicate_by_column_unknown_raises(sample_table):
     dedup = TableDeduplicator(sample_table)
     with pytest.raises(KeyError):
