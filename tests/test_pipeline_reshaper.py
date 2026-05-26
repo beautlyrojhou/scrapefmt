@@ -44,6 +44,17 @@ def test_pipeline_split_column_correct_row_count(pipeline):
     assert len(result.rows) == 3
 
 
+def test_pipeline_split_column_values_are_stripped(pipeline):
+    """Ensure split values have surrounding whitespace removed."""
+    result = pipeline.split_column("Location", ",", ["City", "Country"]).build()
+    city_idx = result.headers.index("City")
+    country_idx = result.headers.index("Country")
+    cities = [row[city_idx] for row in result.rows]
+    countries = [row[country_idx] for row in result.rows]
+    assert cities == ["New York", "London", "Paris"]
+    assert countries == ["USA", "UK", "France"]
+
+
 def test_pipeline_melt_expands_rows(pipeline):
     result = pipeline.melt(id_columns=["Name"]).build()
     # 3 rows x 2 value columns
@@ -77,6 +88,13 @@ def test_pipeline_fill_down_preserves_headers():
     ))
     result = pipeline.fill_down().build()
     assert result.headers == ["Group", "Value"]
+
+
+def test_pipeline_fill_down_sparse_table(sparse_table):
+    """Ensure fill_down correctly propagates values across multiple consecutive blanks."""
+    result = ScrapePipeline(sparse_table).fill_down(column="Group").build()
+    groups = [row[0] for row in result.rows]
+    assert groups == ["A", "A", "A", "B", "B"]
 
 
 def test_pipeline_chained_split_and_filter(pipeline):
